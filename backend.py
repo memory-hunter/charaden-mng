@@ -1,9 +1,8 @@
 import struct
 
-IN_PHONE_PATH = 'home/moapl/userdata/avatar/'
+IN_PHONE_PATH = '/home/moapl/userdata/avatar/'
 AVATAR_MNG_PATH: str = ''
 AVATAR_MNG_SZ: int = 6564
-LAST_INDEX: int = -1
 
 '''
 AVATAR.MNG specification:
@@ -17,18 +16,20 @@ limit - 10(?) - (6564/656 =~ 10)
 valid page:
 0x0 - index - int32 - starts from 1
 0x6 - name - shift-jis string - length???
-0x48 - title - shift-jis string - length???
-0x178 - size of file - int32
-0x17C - path - valid path string - length???
+0x48 - 0x90 - title - shift-jis string - max.length of 36 bytes.
 0x158 - width - int32
 0x15C - height - int32
+0x178 - size of file - int32
+0x17C - path - valid path string - length???
+
+everything else is surrounded by null bytes
 
 empty page:
 FF FF FF FF and 00 bytes for the rest of 0x290
 '''
 
 class Charaden:
-    def __init__(self, name: str, title: str, size_of_file: int, path: str, width: int, height: int):
+    def __init__(self, name: bytes, title: bytes, size_of_file: int, path: str, width: int, height: int):
         self.name = name
         self.title = title
         self.size_of_file = size_of_file
@@ -37,24 +38,16 @@ class Charaden:
         self.height = height
 
     def __repr__(self):
-        return (f"Name: {self.name}\nTitle: {self.title}\nSize: {self.size_of_file}"
-                f"\nWidth: {self.width}\nHeight: {self.height}")
+        return (f"Name: {self.name}\n"
+                f"Title: {self.title}\n"
+                f"Size: {self.size_of_file}\n"
+                f"Path: {self.path}\n"
+                f"Width: {self.width}\n"
+                f"Height: {self.height}")
+
 
 CHARADEN_LIST: list[Charaden] = []
 change_made = False
-
-def check_last_index():
-    with open(AVATAR_MNG_PATH, 'rb', encoding='shift-jis') as avmng:
-        last_idx = 0
-        while True:
-            idx = avmng.read(0x4)
-            if idx == '':
-                LAST_INDEX = last_idx
-                return
-            idx = int(idx)
-            if int(idx) != 0xFFFFFFFF:
-                last_idx = max(last_idx, idx)
-            avmng.read(0x28C)
 
 def read_list():
     with open(AVATAR_MNG_PATH, 'rb') as file:
@@ -117,18 +110,70 @@ def read_list():
             CHARADEN_LIST.append(Charaden(name, title, size_of_file, path, width, height))
 
 def print_list():
+    if len(CHARADEN_LIST) == 0:
+        print("List of Chara-dens is empty.")
+        return
     for i, chrdn in enumerate(CHARADEN_LIST):
         if i == len(CHARADEN_LIST) - 1: print()
         print(str(i + 1) + ":\n" + repr(chrdn))
 
-def insert():
-    # Take in all data and add to list
+def insert(charaden: Charaden):
     global change_made
     change_made = True
-    check_last_index()
+    CHARADEN_LIST.append(charaden)
 
 def delete(index: int):
-    # Delete with an index
     global change_made
     change_made = True
     CHARADEN_LIST.pop(index - 1)
+
+def charaden_page(charaden: Charaden, idx: int) -> bytes:
+    name_max_length = 0x48 - 0x6
+    title_max_length = 0x158 - 0x48
+    path_max_length = 0x290 - 0x17C
+
+    name_encoded = charaden.name[:name_max_length]
+    title_encoded = charaden.title[:title_max_length]
+    path_encoded = charaden.path[:path_max_length].encode('shift-jis')
+
+    name_padded = name_encoded.ljust(name_max_length, b'\x00')
+    title_padded = title_encoded.ljust(title_max_length, b'\x00')
+    path_padded = path_encoded.ljust(path_max_length, b'\x00')
+
+    page = struct.pack(
+        '<I', idx
+    ) + b'\x00\x00'
+
+    page += name_padded
+    page += title_padded
+
+    page += struct.pack(
+        '<I', charaden.width
+    ) + struct.pack(
+        '<I', charaden.height
+    )
+    
+    page += b'\x00' * (0x178 - 0x160)
+
+    page += struct.pack(
+        '<I', charaden.size_of_file
+    )
+
+    page += path_padded
+
+    page_padded = page.ljust(0x290, b'\x00')
+
+    return page_padded
+
+
+def empty_charaden_page() -> bytes:
+    return b'\xFF\xFF\xFF\xFF' + b'\x00' * (0x290 - 0x4)
+
+def write_avatar_mng_file():
+    with open(AVATAR_MNG_PATH, 'wb') as avmng:
+        for i in range(10):
+            if i >= len(CHARADEN_LIST):
+                avmng.write(empty_charaden_page())
+            else:
+                avmng.write(charaden_page(CHARADEN_LIST[i], i + 1))
+        avmng.write(b'\x01\x00\x00\x00')
