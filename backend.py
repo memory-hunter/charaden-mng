@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import struct
 
 IN_PHONE_PATH = '/home/moapl/userdata/avatar/'
@@ -30,19 +31,20 @@ FF FF FF FF and 00 bytes for the rest of 0x290
 '''
 
 class Charaden:
-    def __init__(self, name: bytes, title: bytes, size_of_file: int, path: str, width: int, height: int):
+    def __init__(self, name: bytes, title: bytes, size_of_file: int, path_pc: str, path_phone, width: int, height: int):
         self.name = name
         self.title = title
         self.size_of_file = size_of_file
-        self.path = path
+        self.path_pc = path_pc
+        self.path_phone = path_phone
         self.width = width
         self.height = height
 
     def __repr__(self):
-        return (f"Name: {self.name.decode()}\n"
-                f"Title: {self.title.decode()}\n"
+        return (f"Name: {self.name.decode("shift-jis")}\n"
+                f"Title: {self.title.decode("shift-jis")}\n"
                 f"Size: {self.size_of_file}\n"
-                f"Path: {self.path}\n"
+                f"Path: {self.path_phone}\n"
                 f"Width: {self.width}\n"
                 f"Height: {self.height}")
 
@@ -70,7 +72,7 @@ def read_list():
                 if char == b'\x00' or not char:
                     break
                 name_bytes += char
-            name = name_bytes.decode('shift-jis')
+            name = name_bytes
 
     
             file.seek(offset + 0x48)
@@ -80,7 +82,7 @@ def read_list():
                 if char == b'\x00' or not char:
                     break
                 title_bytes += char
-            title = title_bytes.decode('shift-jis')
+            title = title_bytes
 
     
             file.seek(offset + 0x178)
@@ -95,7 +97,7 @@ def read_list():
                 if char == b'\x00' or not char:
                     break
                 path_bytes += char
-            path = path_bytes.decode('shift-jis')
+            path = path_bytes.decode()
 
     
             file.seek(offset + 0x158)
@@ -108,7 +110,7 @@ def read_list():
             height = struct.unpack('<I', height_bytes)[0]
 
     
-            CHARADEN_LIST.append(Charaden(name, title, size_of_file, path, width, height))
+            CHARADEN_LIST.append(Charaden(name, title, size_of_file, '', path, width, height))
 
 def print_list():
     if len(CHARADEN_LIST) == 0:
@@ -135,8 +137,25 @@ def charaden_page(charaden: Charaden, idx: int) -> bytes:
 
     name_encoded = charaden.name[:name_max_length]
     title_encoded = charaden.title[:title_max_length]
-    path_encoded = charaden.path[:path_max_length].encode('shift-jis')
-
+    
+    if charaden.path_pc != '':
+        path_parts = charaden.path_pc.split(os.sep)
+        path_parts = list(map(lambda part: os.sep if part == '' else part, charaden.path_pc.split(os.sep)))
+        directory_parts = path_parts[:-1]
+        new_filename = f"{str(idx).zfill(2)}.AFD"
+        new_path = Path(os.path.join(*directory_parts, new_filename)).as_posix()
+        try:
+            os.makedirs(os.path.dirname(new_path), exist_ok=True)
+            old_path_pc = charaden.path_pc
+            if old_path_pc != new_path:
+                os.rename(old_path_pc, new_path)
+                print(f"File renamed from {old_path_pc} to {new_path} for phone compatibility.")
+        except Exception as e:
+            print(f"Error renaming file. Reason: {e}. Exiting...")
+            exit()
+        path_encoded = new_path[:path_max_length].encode('shift-jis')
+    else:
+        path_encoded = charaden.path_phone[:path_max_length].encode('shift-jis')
     name_padded = name_encoded.ljust(name_max_length, b'\x00')
     title_padded = title_encoded.ljust(title_max_length, b'\x00')
     path_padded = path_encoded.ljust(path_max_length, b'\x00')
@@ -171,10 +190,12 @@ def empty_charaden_page() -> bytes:
     return b'\xFF\xFF\xFF\xFF' + b'\x00' * (0x290 - 0x4)
 
 def write_avatar_mng_file():
+    buffer = bytes()
+    for i in range(10):
+        if i >= len(CHARADEN_LIST):
+            buffer += empty_charaden_page()
+        else:
+            buffer += (charaden_page(CHARADEN_LIST[i], i + 1))
+    buffer += (b'\x01\x00\x00\x00')
     with open(AVATAR_MNG_PATH, 'wb') as avmng:
-        for i in range(10):
-            if i >= len(CHARADEN_LIST):
-                avmng.write(empty_charaden_page())
-            else:
-                avmng.write(charaden_page(CHARADEN_LIST[i], i + 1))
-        avmng.write(b'\x01\x00\x00\x00')
+        avmng.write(buffer)

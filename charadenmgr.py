@@ -25,10 +25,10 @@ def input_charaden_fields() -> dict:
     path = None
     size_of_file = None
     while True:
-        path = input("Enter path to the file:").strip().replace("'", "").replace('"', "")
+        path = input("Enter path to the file: ").strip().replace("'", "").replace('"', "")
         if os.path.isfile(path):
             size_of_file = os.path.getsize(path)
-            path = backend.IN_PHONE_PATH + Path(path).as_posix().split('/')[-1]
+            path_phone = backend.IN_PHONE_PATH + Path(path).as_posix().split(os.sep)[-1]
             break
         print("Invalid file path.")
 
@@ -53,13 +53,16 @@ def input_charaden_fields() -> dict:
             print("Invalid input. Please enter an integer.")
 
     print("Chara-den successfully added.")
-    return backend.Charaden(name, title, size_of_file, path, width, height)
+    return backend.Charaden(name, title, size_of_file, path, path_phone, width, height)
 
 def handle_command(command):
     if command == 'l':
         backend.print_list()
     elif command == 'i':
-        backend.insert(input_charaden_fields())
+        if len(backend.CHARADEN_LIST) >= 10:
+            print("The Chara-den list has reached its (supposed) limit. Delete some, don't be so greedy!")
+        else:
+            backend.insert(input_charaden_fields())
     elif command == 'd':
         backend.print_list()
         try:
@@ -137,7 +140,7 @@ def main():
                         os.makedirs(directory, exist_ok=True)
                     backend.AVATAR_MNG_PATH = output_path + "AVATAR.MNG"
                 backend.write_avatar_mng_file()
-                print("Changes have been written. Please make sure to replace the exact .CFD files inside the Chara-den folder and swap in the AVATAR.MNG.")
+                print("Changes have been written. Please make sure to replace the exact .AFD files inside the Chara-den folder and swap in the AVATAR.MNG.")
                 break
 
 if __name__ == '__main__':
