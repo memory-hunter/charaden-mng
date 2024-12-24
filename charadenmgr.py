@@ -130,7 +130,12 @@ def main():
             if decision == 'y' or decision == 'Y':
                 if not args.avatar_mng_file:
                     output_path = input("Enter the path to save the AVATAR.MNG file at: ").strip()
-                    backend.AVATAR_MNG_PATH = output_path + '/AVATAR.MNG'
+                    output_path = os.path.join(output_path, '')
+                    output_path = os.path.expanduser(output_path)
+                    directory = os.path.dirname(output_path)
+                    if not os.path.exists(directory):
+                        os.makedirs(directory, exist_ok=True)
+                    backend.AVATAR_MNG_PATH = output_path + "AVATAR.MNG"
                 backend.write_avatar_mng_file()
                 print("Changes have been written. Please make sure to replace the exact .CFD files inside the Chara-den folder and swap in the AVATAR.MNG.")
                 break

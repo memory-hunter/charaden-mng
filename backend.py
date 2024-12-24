@@ -1,3 +1,4 @@
+import os
 import struct
 
 IN_PHONE_PATH = '/home/moapl/userdata/avatar/'
@@ -38,8 +39,8 @@ class Charaden:
         self.height = height
 
     def __repr__(self):
-        return (f"Name: {self.name}\n"
-                f"Title: {self.title}\n"
+        return (f"Name: {self.name.decode()}\n"
+                f"Title: {self.title.decode()}\n"
                 f"Size: {self.size_of_file}\n"
                 f"Path: {self.path}\n"
                 f"Width: {self.width}\n"
