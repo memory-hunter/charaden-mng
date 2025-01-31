@@ -41,8 +41,8 @@ class Charaden:
         self.height = height
 
     def __repr__(self):
-        return (f"Name: {self.name.decode("shift-jis")}\n"
-                f"Title: {self.title.decode("shift-jis")}\n"
+        return (f"Name: {self.name.decode('shift-jis')}\n"
+                f"Title: {self.title.decode('shift-jis')}\n"
                 f"Size: {self.size_of_file}\n"
                 f"Path: {self.path_phone}\n"
                 f"Width: {self.width}\n"
@@ -144,6 +144,7 @@ def charaden_page(charaden: Charaden, idx: int) -> bytes:
         directory_parts = path_parts[:-1]
         new_filename = f"{str(idx).zfill(2)}.AFD"
         new_path = Path(os.path.join(*directory_parts, new_filename)).as_posix()
+        path_encoded = new_path[:path_max_length].encode('shift-jis')
         try:
             os.makedirs(os.path.dirname(new_path), exist_ok=True)
             old_path_pc = charaden.path_pc
@@ -153,7 +154,6 @@ def charaden_page(charaden: Charaden, idx: int) -> bytes:
         except Exception as e:
             print(f"Error renaming file. Reason: {e}. Exiting...")
             exit()
-        path_encoded = new_path[:path_max_length].encode('shift-jis')
     else:
         path_encoded = charaden.path_phone[:path_max_length].encode('shift-jis')
     name_padded = name_encoded.ljust(name_max_length, b'\x00')
